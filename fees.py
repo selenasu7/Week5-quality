@@ -1,56 +1,71 @@
-def tuition_fee(courses, student_type, summer, discount, extra=[]):
-    # t: 1=student, 2=staff child, 3=scholarship
-    total = 0
+"""Tuition fee calculation module refactored from legacy_fees.py."""
 
-    for c in courses:
-        if student_type == 1:
-            total = total + c["h"] * 350
-        elif student_type == 2:
-            total = total + c["h"] * 350 * 0.5
-        elif student_type == 3:
-            total = total + 0
+from dataclasses import dataclass
+from enum import Enum
 
-    if total > 6000:
-        total = total - 200
+HOUR_RATE = 350
+HIGH_FEE_THRESHOLD = 6000
+HIGH_FEE_REDUCTION = 200
+SUMMER_FEE = 150
 
-    if summer == True:
-        total = total + 150
 
-    if discount != None:
-        total = total - discount
+class StudentType(Enum):
+    """Supported student fee categories."""
 
-    for e in extra:
-        total = total + e
+    REGULAR = 1
+    STAFF_CHILD = 2
+    SCHOLARSHIP = 3
 
+
+RATE_MULTIPLIER = {
+    StudentType.REGULAR: 1.0,
+    StudentType.STAFF_CHILD: 0.5,
+    StudentType.SCHOLARSHIP: 0.0,
+}
+
+REPORT_LABELS = {
+    StudentType.REGULAR: "Student fee",
+    StudentType.STAFF_CHILD: "Staff child fee",
+    StudentType.SCHOLARSHIP: "Scholarship fee",
+}
+
+
+@dataclass(frozen=True)
+class Course:
+    """A course with its credit hours."""
+
+    hours: int
+
+
+def tuition_fee(courses, student_type, summer=False, discount=0, extras=()):
+    """Calculate the total tuition fee for a student."""
+    rate = HOUR_RATE * RATE_MULTIPLIER[student_type]
+    total = sum(course.hours * rate for course in courses)
+    if total > HIGH_FEE_THRESHOLD:
+        total -= HIGH_FEE_REDUCTION
+    if summer:
+        total += SUMMER_FEE
+    total -= discount
+    total += sum(extras)
     return total
 
 
-
-
-
-def report(courses, student_type, summer, discount):
-    x = tuition_fee(courses, student_type, summer, discount)
-
-    if student_type == 1:
-        print("Student fee: " + str(x))
-    elif student_type == 2:
-        print("Staff child fee: " + str(x))
-
-    if x > 6000:
-        print("High fee")
-
-    return x
+def report(courses, student_type, summer=False, discount=0):
+    """Build a text fee report without printing directly."""
+    fee = tuition_fee(courses, student_type, summer, discount)
+    lines = [f"{REPORT_LABELS[student_type]}: {fee}"]
+    if fee > HIGH_FEE_THRESHOLD:
+        lines.append("High fee")
+    return "\n".join(lines)
 
 
 def process_all(students):
-    for st in students:
-        if st["type"] == 1:
-            fee = tuition_fee(st["courses"], 1, st["summer"], None)
-
-        elif st["type"] == 2:
-            fee = tuition_fee(st["courses"], 2, st["summer"], None)
-
-        else:
-            continue
-
-        print(st["name"], fee)
+    """Calculate tuition fees for all students, including scholarship students."""
+    return {
+        student["name"]: tuition_fee(
+            student["courses"],
+            student["type"],
+            student["summer"],
+        )
+        for student in students
+    }
